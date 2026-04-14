@@ -1,0 +1,130 @@
+<mxfile host="app.diagrams.net" modified="2026-03-18T21:16:00.000Z" agent="Terraform IAC" version="24.0.0" type="device">
+  <diagram name="NYC Taxi Pipeline" id="pipeline">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Título -->
+        <mxCell id="title" value="Pipeline de Ingestão — NYC Taxi Data (AWS)" style="text;html=1;fontSize=20;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="450" y="20" width="500" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Fonte de Dados -->
+        <mxCell id="source" value="NYC TLC&#xa;CloudFront&#xa;(Parquet Files)&#xa;d37ci6vzurychx.cloudfront.net" style="shape=cloud;whiteSpace=wrap;html=1;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="200" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- Step Functions -->
+        <mxCell id="sfn" value="Step Functions&#xa;Orchestrator&#xa;(Parallel)" style="shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;size=0.3;fontSize=11;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="320" y="330" width="160" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Glue Jobs -->
+        <mxCell id="glue_yellow" value="Glue Job&#xa;ingest-yellow&#xa;(2016-2025)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="560" y="140" width="140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="glue_green" value="Glue Job&#xa;ingest-green&#xa;(2016-2025)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="560" y="240" width="140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="glue_fhvhv" value="Glue Job&#xa;ingest-fhvhv&#xa;(2019-2025)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="560" y="340" width="140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="glue_fhv" value="Glue Job&#xa;ingest-fhv&#xa;(2016-2025)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#e6d0de;strokeColor=#996185;" vertex="1" parent="1">
+          <mxGeometry x="560" y="440" width="140" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- S3 Bronze -->
+        <mxCell id="s3_bronze" value="S3 Bronze&#xa;/yellow/year=/month=/&#xa;/green/year=/month=/&#xa;/fhvhv/year=/month=/&#xa;/fhv/year=/month=/" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontSize=10;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="810" y="270" width="170" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- Glue Catalog -->
+        <mxCell id="catalog" value="Glue Catalog&#xa;nyc_taxi_db" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="170" width="130" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Crawler -->
+        <mxCell id="crawler" value="Glue Crawler&#xa;bronze-crawler" style="rounded=1;whiteSpace=wrap;html=1;fontSize=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="310" width="130" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- S3 Silver / Gold (futuro) -->
+        <mxCell id="s3_silver" value="S3 Silver&#xa;(futuro)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="230" width="120" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="s3_gold" value="S3 Gold&#xa;(futuro)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="340" width="120" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- S3 Scripts -->
+        <mxCell id="s3_scripts" value="S3 Scripts&#xa;ingest_to_bronze.py" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fontSize=10;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="560" y="550" width="140" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Setas: Source → SFN -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="source" target="sfn" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Setas: SFN → Jobs (paralelo) -->
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="sfn" target="glue_yellow" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="sfn" target="glue_green" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="sfn" target="glue_fhvhv" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="sfn" target="glue_fhv" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Setas: Jobs → S3 Bronze -->
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="glue_yellow" target="s3_bronze" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="glue_green" target="s3_bronze" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="glue_fhvhv" target="s3_bronze" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="glue_fhv" target="s3_bronze" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Setas: S3 Bronze → Crawler → Catalog -->
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="s3_bronze" target="crawler" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="crawler" target="catalog" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Setas: Bronze → Silver → Gold (futuro, tracejado) -->
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;dashed=1;" edge="1" source="s3_bronze" target="s3_silver" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;dashed=1;" edge="1" source="s3_silver" target="s3_gold" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Seta: Scripts → Jobs -->
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;dashed=1;strokeColor=#999999;" edge="1" source="s3_scripts" target="glue_fhvhv" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Legenda -->
+        <mxCell id="leg1" value="── Fluxo ativo" style="text;html=1;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="120" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2" value="- - Fluxo futuro" style="text;html=1;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="545" width="120" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

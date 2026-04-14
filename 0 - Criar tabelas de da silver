@@ -1,0 +1,17 @@
+0 - Criar tabelas de da silver
+1 - Fazer a qualidade
+2 - Fazer detecção de dados sensiveis
+3 - Colocar criptografia
+4 -  
+
+
+
+açoes de transofamação  da bronze para silver 
+retirar duplicados
+padronizar os nomes dos campos para todas as tabelas
+garantir a tipagem correta dos campos
+padronizar o conteudo de campos textos para maiusculo
+
+
+mudar para iceberg.
+colocar rash nas tabelas.
