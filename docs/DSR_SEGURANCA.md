@@ -7,7 +7,7 @@
 Projeto: nyc-taxi-pipeline
 Data de elaboração: 25 de março de 2026
 Responsável técnico: Leonardo Dorta
-Ambiente: AWS — Conta <AWS_ACCOUNT_ID> — Região us-east-1
+Ambiente: AWS — Conta &lt;AWS_ACCOUNT_ID&gt; — Região us-east-1
 Versão do documento: 1.0
 
 ---
@@ -95,7 +95,7 @@ Os jobs do Glue não possuem uma Security Configuration associada, o que signifi
 
 **Migração do Terraform State para backend remoto.** Recomenda-se a criação de um bucket S3 dedicado com criptografia habilitada para armazenar o arquivo de estado, acompanhado de uma tabela DynamoDB para controle de lock. O identificador da conta deve ser obtido dinamicamente via data source do Terraform (aws_caller_identity) em vez de ser definido como variável.
 
-**Restrição das políticas IAM do Step Functions.** As permissões de Glue devem ser restritas utilizando o padrão de ARN do projeto (arn:aws:glue:us-east-1:<AWS_ACCOUNT_ID>:job/nyc-taxi-pipeline-*) em vez do wildcard. O mesmo se aplica aos crawlers e aos recursos do EventBridge.
+**Restrição das políticas IAM do Step Functions.** As permissões de Glue devem ser restritas utilizando o padrão de ARN do projeto (arn:aws:glue:us-east-1:&lt;AWS_ACCOUNT_ID&gt;:job/nyc-taxi-pipeline-*) em vez do wildcard. O mesmo se aplica aos crawlers e aos recursos do EventBridge.
 
 **Habilitação de logging no Step Functions.** Ambas as state machines devem ter logging configurado no CloudWatch com nível ERROR no mínimo, incluindo os dados de execução para facilitar a depuração.
 

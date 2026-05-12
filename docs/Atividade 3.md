@@ -1,6 +1,6 @@
 # 
 
-# conta isengard <AWS_ACCOUNT_ID>
+# conta AWS &lt;AWS_ACCOUNT_ID&gt;
 
 # 
 

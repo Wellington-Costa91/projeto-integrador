@@ -8,10 +8,10 @@ Parameters:
     Default: Admin/your-user
   AwsAccountId:
     Type: String
-    Default: '<AWS_ACCOUNT_ID>'
+    Default: '000000000000'
   AthenaResultsBucket:
     Type: String
-    Default: aws-athena-query-results-us-east-1-<AWS_ACCOUNT_ID>
+    Default: aws-athena-query-results-us-east-1-000000000000
 
 Resources:
 

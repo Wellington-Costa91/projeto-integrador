@@ -7,5 +7,6 @@ variable "project_name" {
 }
 
 variable "account_id" {
-  default = "<AWS_ACCOUNT_ID>"
+  description = "AWS Account ID — informe via -var, terraform.tfvars (não versionado) ou data.aws_caller_identity.current.account_id"
+  type        = string
 }
