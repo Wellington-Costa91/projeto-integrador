@@ -172,11 +172,22 @@ aws stepfunctions start-execution \
 
 ---
 
+## 🎤 Apresentação Final
+
+A apresentação executiva do projeto (slides de defesa) está disponível em:
+
+📎 **[docs/Apresentação_Final.pdf](docs/Apresentação_Final.pdf)**
+
+Contém: contexto e questões de pesquisa, arquitetura serverless 100% IaC na AWS, volume processado (≈3 bilhões de corridas / 189 GB), modelo dimensional e principais insights (dinâmica táxi vs aplicativos, gorjetas, impacto COVID-19 e taxa CBD).
+
+---
+
 ## 📸 Evidências
 
 - `dashboard/dashboard.png` — Screenshot do dashboard QuickSight
 - `docs/tabela-gold.jpeg` — Modelo dimensional Gold
 - `docs/diagrama_pipeline.drawio` — Diagrama do pipeline
+- `docs/Apresentação_Final.pdf` — Slides da apresentação final
 
 ---
 
