@@ -20,12 +20,14 @@ output "silver_job_name" {
   value = aws_glue_job.bronze_to_silver.name
 }
 
-output "crawler_names" {
-  value = {
-    bronze = aws_glue_crawler.bronze.name
-  }
+output "gold_job_name" {
+  value = aws_glue_job.silver_to_gold.name
 }
 
 output "dq_ruleset_names" {
   value = { for k, v in aws_glue_data_quality_ruleset.silver : k => v.name }
+}
+
+output "zones_job_name" {
+  value = aws_glue_job.ingest_zones.name
 }

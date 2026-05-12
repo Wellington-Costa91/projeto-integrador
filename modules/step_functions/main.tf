@@ -26,11 +26,6 @@ resource "aws_iam_role_policy" "this" {
       },
       {
         Effect   = "Allow"
-        Action   = ["glue:StartCrawler", "glue:GetCrawler"]
-        Resource = "*"
-      },
-      {
-        Effect   = "Allow"
         Action   = ["glue:StartDataQualityRulesetEvaluationRun", "glue:GetDataQualityRulesetEvaluationRun"]
         Resource = "*"
       },
@@ -64,57 +59,46 @@ resource "aws_sfn_state_machine" "ingest" {
   role_arn = aws_iam_role.this.arn
 
   definition = jsonencode({
-    Comment = "Ingestao paralela + Retry + Crawler Bronze + chama Transformacao"
+    Comment = "Ingestao paralela + Retry + chama Transformacao"
     StartAt = "IngestAll"
     States = {
       IngestAll = {
         Type = "Parallel"
-        Branches = [
-          for name in values(var.glue_job_names) : {
-            StartAt = "Run-${name}"
-            States = {
-              "Run-${name}" = {
-                Type     = "Task"
-                Resource = "arn:aws:states:::glue:startJobRun.sync"
-                Parameters = { JobName = name }
-                End = true
+        Branches = concat(
+          [
+            for name in values(var.glue_job_names) : {
+              StartAt = "Run-${name}"
+              States = {
+                "Run-${name}" = {
+                  Type     = "Task"
+                  Resource = "arn:aws:states:::glue:startJobRun.sync"
+                  Parameters = { JobName = name }
+                  End = true
+                }
               }
             }
-          }
-        ]
+          ],
+          [
+            {
+              StartAt = "Run-${var.zones_job_name}"
+              States = {
+                "Run-${var.zones_job_name}" = {
+                  Type     = "Task"
+                  Resource = "arn:aws:states:::glue:startJobRun.sync"
+                  Parameters = { JobName = var.zones_job_name }
+                  End = true
+                }
+              }
+            }
+          ]
+        )
         Next = "RetryFailed"
       }
       RetryFailed = {
         Type     = "Task"
         Resource = "arn:aws:states:::glue:startJobRun.sync"
         Parameters = { JobName = var.retry_job_name }
-        Next = "RunCrawlerBronze"
-      }
-      RunCrawlerBronze = {
-        Type     = "Task"
-        Resource = "arn:aws:states:::aws-sdk:glue:startCrawler"
-        Parameters = { Name = var.bronze_crawler_name }
-        Next = "WaitCrawlerBronze"
-      }
-      WaitCrawlerBronze = {
-        Type    = "Wait"
-        Seconds = 30
-        Next    = "CheckCrawlerBronze"
-      }
-      CheckCrawlerBronze = {
-        Type     = "Task"
-        Resource = "arn:aws:states:::aws-sdk:glue:getCrawler"
-        Parameters = { Name = var.bronze_crawler_name }
-        Next = "CrawlerBronzeDone?"
-      }
-      "CrawlerBronzeDone?" = {
-        Type = "Choice"
-        Choices = [{
-          Variable     = "$.Crawler.State"
-          StringEquals = "READY"
-          Next         = "StartTransform"
-        }]
-        Default = "WaitCrawlerBronze"
+        Next = "StartTransform"
       }
       StartTransform = {
         Type     = "Task"
@@ -206,6 +190,12 @@ resource "aws_sfn_state_machine" "transform" {
             }
           }
         ]
+        Next = "SilverToGold"
+      }
+      SilverToGold = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::glue:startJobRun.sync"
+        Parameters = { JobName = var.gold_job_name }
         Next = "TransformSuccess"
       }
       TransformSuccess = {

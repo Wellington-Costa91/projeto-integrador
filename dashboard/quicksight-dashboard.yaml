@@ -1,0 +1,646 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: NYC Mobility Analytics - QuickSight Dashboard completo com visuais
+
+Parameters:
+  QuickSightUsername:
+    Type: String
+    Description: QuickSight username (ex. Admin/your-user)
+    Default: Admin/your-user
+  AwsAccountId:
+    Type: String
+    Default: '<AWS_ACCOUNT_ID>'
+  AthenaResultsBucket:
+    Type: String
+    Default: aws-athena-query-results-us-east-1-<AWS_ACCOUNT_ID>
+
+Resources:
+
+  QuickSightAthenaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: nyc-taxi-quicksight-athena-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: quicksight.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: athena-s3-glue-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ['athena:*']
+                Resource: '*'
+              - Effect: Allow
+                Action: ['glue:GetTable', 'glue:GetTables', 'glue:GetDatabase', 'glue:GetDatabases', 'glue:GetPartitions']
+                Resource: '*'
+              - Effect: Allow
+                Action: ['s3:GetObject', 's3:ListBucket', 's3:GetBucketLocation', 's3:PutObject']
+                Resource:
+                  - !Sub 'arn:aws:s3:::nyc-taxi-pipeline-gold-${AwsAccountId}*'
+                  - !Sub 'arn:aws:s3:::nyc-taxi-pipeline-silver-${AwsAccountId}*'
+                  - !Sub 'arn:aws:s3:::${AthenaResultsBucket}*'
+
+  AthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: nyc-taxi-workgroup
+      State: ENABLED
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub 's3://${AthenaResultsBucket}/'
+
+  AthenaDataSource:
+    Type: AWS::QuickSight::DataSource
+    DependsOn: AthenaWorkGroup
+    Properties:
+      AwsAccountId: !Ref AwsAccountId
+      DataSourceId: nyc-taxi-athena-ds
+      Name: NYC Taxi Athena Gold
+      Type: ATHENA
+      DataSourceParameters:
+        AthenaParameters:
+          WorkGroup: nyc-taxi-workgroup
+          RoleArn: !GetAtt QuickSightAthenaRole.Arn
+      Permissions:
+        - Principal: !Sub 'arn:aws:quicksight:us-east-1:${AwsAccountId}:user/default/${QuickSightUsername}'
+          Actions:
+            - quicksight:DescribeDataSource
+            - quicksight:DescribeDataSourcePermissions
+            - quicksight:PassDataSource
+            - quicksight:UpdateDataSource
+            - quicksight:DeleteDataSource
+            - quicksight:UpdateDataSourcePermissions
+
+  MainDataSet:
+    Type: AWS::QuickSight::DataSet
+    DependsOn: AthenaDataSource
+    Properties:
+      AwsAccountId: !Ref AwsAccountId
+      DataSetId: nyc-taxi-main-dataset
+      Name: NYC Taxi - Fato Corrida Gold
+      ImportMode: DIRECT_QUERY
+      PhysicalTableMap:
+        MainQuery:
+          CustomSql:
+            DataSourceArn: !GetAtt AthenaDataSource.Arn
+            Name: fato_corrida_completa
+            SqlQuery: >
+              SELECT
+                f.id_corrida, f.datahora_embarque, f.ano_mes,
+                CAST(f.year AS VARCHAR) AS year, CAST(f.month AS VARCHAR) AS month,
+                f.duracao_segundos, f.distancia_percorrida,
+                f.valor_justo, f.valor_gorjeta, f.valor_pedagio,
+                f.valor_taxa_modernizacao, f.valor_taxa_aeroporto,
+                f.valor_taxa_congestionamento, f.valor_taxa_congestionamento_cbd,
+                f.valor_seguro_bfc, f.valor_demais_taxas, f.quantidade_viagem,
+                t.grupo_tipo_transporte, e.empresa,
+                pu.distrito AS distrito_embarque, pu.zona AS zona_embarque,
+                pu.zona_servico AS zona_servico_embarque,
+                pu.regiao_agrupada AS regiao_agrupada_embarque,
+                do2.distrito AS distrito_desembarque, do2.zona AS zona_desembarque,
+                d.faixa_distancia, d.descricao_distancia,
+                h.faixa_horaria, g.teve_gorjeta, c.incide_taxa_cbd,
+                CASE WHEN g.teve_gorjeta = 'SIM' THEN 1.0 ELSE 0.0 END AS flag_gorjeta
+              FROM nyc_taxi_gold.fato_corrida f
+              LEFT JOIN nyc_taxi_gold.dim_tipo_transporte t ON f.id_tipo_transporte = t.id_tipo_transporte
+              LEFT JOIN nyc_taxi_gold.dim_empresa e ON f.id_empresa = e.id_empresa
+              LEFT JOIN nyc_taxi_gold.dim_local pu ON f.id_local_embarque = pu.id_local
+              LEFT JOIN nyc_taxi_gold.dim_local do2 ON f.id_local_desembarque = do2.id_local
+              LEFT JOIN nyc_taxi_gold.dim_distancia d ON f.id_faixa_distancia = d.id_distancia
+              LEFT JOIN nyc_taxi_gold.dim_tempo_horario h ON f.id_faixa_horaria = h.id_faixa_horaria
+              LEFT JOIN nyc_taxi_gold.dim_status_gorjeta g ON f.id_status_gorjeta = g.id_status_gorjeta
+              LEFT JOIN nyc_taxi_gold.dim_status_congestionamento c ON f.id_status_congestionamento = c.id_status_congestionamento
+              WHERE f.id_corrida NOT IN (25771908824, 25772271249)
+            Columns:
+              - {Name: id_corrida, Type: INTEGER}
+              - {Name: datahora_embarque, Type: DATETIME}
+              - {Name: ano_mes, Type: STRING}
+              - {Name: year, Type: STRING}
+              - {Name: month, Type: STRING}
+              - {Name: duracao_segundos, Type: INTEGER}
+              - {Name: distancia_percorrida, Type: DECIMAL}
+              - {Name: valor_justo, Type: DECIMAL}
+              - {Name: valor_gorjeta, Type: DECIMAL}
+              - {Name: valor_pedagio, Type: DECIMAL}
+              - {Name: valor_taxa_modernizacao, Type: DECIMAL}
+              - {Name: valor_taxa_aeroporto, Type: DECIMAL}
+              - {Name: valor_taxa_congestionamento, Type: DECIMAL}
+              - {Name: valor_taxa_congestionamento_cbd, Type: DECIMAL}
+              - {Name: valor_seguro_bfc, Type: DECIMAL}
+              - {Name: valor_demais_taxas, Type: DECIMAL}
+              - {Name: quantidade_viagem, Type: INTEGER}
+              - {Name: grupo_tipo_transporte, Type: STRING}
+              - {Name: empresa, Type: STRING}
+              - {Name: distrito_embarque, Type: STRING}
+              - {Name: zona_embarque, Type: STRING}
+              - {Name: zona_servico_embarque, Type: STRING}
+              - {Name: regiao_agrupada_embarque, Type: STRING}
+              - {Name: distrito_desembarque, Type: STRING}
+              - {Name: zona_desembarque, Type: STRING}
+              - {Name: faixa_distancia, Type: STRING}
+              - {Name: descricao_distancia, Type: STRING}
+              - {Name: faixa_horaria, Type: STRING}
+              - {Name: teve_gorjeta, Type: STRING}
+              - {Name: incide_taxa_cbd, Type: STRING}
+              - {Name: flag_gorjeta, Type: DECIMAL}
+      LogicalTableMap:
+        MainLogical:
+          Alias: fato_corrida
+          Source:
+            PhysicalTableId: MainQuery
+      Permissions:
+        - Principal: !Sub 'arn:aws:quicksight:us-east-1:${AwsAccountId}:user/default/${QuickSightUsername}'
+          Actions:
+            - quicksight:DescribeDataSet
+            - quicksight:DescribeDataSetPermissions
+            - quicksight:PassDataSet
+            - quicksight:DescribeIngestion
+            - quicksight:ListIngestions
+
+  Dashboard:
+    Type: AWS::QuickSight::Dashboard
+    DependsOn: MainDataSet
+    Properties:
+      AwsAccountId: !Ref AwsAccountId
+      DashboardId: nyc-taxi-dashboard
+      Name: NYC Mobility Analytics - Yellow Taxi vs HVFHV (2019-2025)
+      DashboardPublishOptions:
+        AdHocFilteringOption:
+          AvailabilityStatus: ENABLED
+        ExportToCSVOption:
+          AvailabilityStatus: ENABLED
+        SheetControlsOption:
+          VisibilityState: EXPANDED
+      Permissions:
+        - Principal: !Sub 'arn:aws:quicksight:us-east-1:${AwsAccountId}:user/default/${QuickSightUsername}'
+          Actions:
+            - quicksight:DescribeDashboard
+            - quicksight:ListDashboardVersions
+            - quicksight:UpdateDashboardPermissions
+            - quicksight:QueryDashboard
+            - quicksight:UpdateDashboard
+            - quicksight:DeleteDashboard
+            - quicksight:DescribeDashboardPermissions
+            - quicksight:UpdateDashboardPublishedVersion
+      Definition:
+        DataSetIdentifierDeclarations:
+          - Identifier: MainDS
+            DataSetArn: !GetAtt MainDataSet.Arn
+
+        FilterGroups:
+          - FilterGroupId: fg-service-type
+            Filters:
+              - CategoryFilter:
+                  FilterId: filter-service-type
+                  Column: {DataSetIdentifier: MainDS, ColumnName: grupo_tipo_transporte}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: sheet-main
+                    Scope: ALL_VISUALS
+            CrossDataset: ALL_DATASETS
+          - FilterGroupId: fg-borough
+            Filters:
+              - CategoryFilter:
+                  FilterId: filter-borough
+                  Column: {DataSetIdentifier: MainDS, ColumnName: distrito_embarque}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: sheet-main
+                    Scope: ALL_VISUALS
+            CrossDataset: ALL_DATASETS
+          - FilterGroupId: fg-year
+            Filters:
+              - CategoryFilter:
+                  FilterId: filter-year
+                  Column: {DataSetIdentifier: MainDS, ColumnName: year}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: sheet-main
+                    Scope: ALL_VISUALS
+            CrossDataset: ALL_DATASETS
+          - FilterGroupId: fg-month
+            Filters:
+              - CategoryFilter:
+                  FilterId: filter-month
+                  Column: {DataSetIdentifier: MainDS, ColumnName: month}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      SelectAllOptions: FILTER_ALL_VALUES
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: sheet-main
+                    Scope: ALL_VISUALS
+            CrossDataset: ALL_DATASETS
+
+          - FilterGroupId: fg-q1-taxi
+            Filters:
+              - CategoryFilter:
+                  FilterId: filter-q1-taxi
+                  Column: {DataSetIdentifier: MainDS, ColumnName: grupo_tipo_transporte}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      CategoryValues:
+                        - TAXI
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: sheet-main
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - q1-area-taxi
+            CrossDataset: ALL_DATASETS
+          - FilterGroupId: fg-q1-aplicativo
+            Filters:
+              - CategoryFilter:
+                  FilterId: filter-q1-aplicativo
+                  Column: {DataSetIdentifier: MainDS, ColumnName: grupo_tipo_transporte}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      CategoryValues:
+                        - APLICATIVO DE TRANSPORTE
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: sheet-main
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - q1-area-aplicativo
+            CrossDataset: ALL_DATASETS
+          - FilterGroupId: fg-q4-manhattan-cbd
+            Filters:
+              - CategoryFilter:
+                  FilterId: filter-q4-regiao-cbd
+                  Column: {DataSetIdentifier: MainDS, ColumnName: regiao_agrupada_embarque}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      CategoryValues:
+                        - MANHATTAN CBD
+              - CategoryFilter:
+                  FilterId: filter-q4-year-2024
+                  Column: {DataSetIdentifier: MainDS, ColumnName: year}
+                  Configuration:
+                    FilterListConfiguration:
+                      MatchOperator: CONTAINS
+                      CategoryValues:
+                        - "2024"
+                        - "2025"
+                        - "2026"
+            ScopeConfiguration:
+              SelectedSheets:
+                SheetVisualScopingConfigurations:
+                  - SheetId: sheet-main
+                    Scope: SELECTED_VISUALS
+                    VisualIds:
+                      - q4-volume-manhattan
+            CrossDataset: ALL_DATASETS
+
+        Sheets:
+          - SheetId: sheet-main
+            Name: NYC Mobility Analytics
+            FilterControls:
+              - Dropdown:
+                  FilterControlId: ctrl-service-type
+                  Title: Service Type
+                  SourceFilterId: filter-service-type
+                  DisplayOptions:
+                    SelectAllOptions: {Visibility: VISIBLE}
+                    TitleOptions: {Visibility: VISIBLE}
+              - Dropdown:
+                  FilterControlId: ctrl-borough
+                  Title: Borough
+                  SourceFilterId: filter-borough
+                  DisplayOptions:
+                    SelectAllOptions: {Visibility: VISIBLE}
+                    TitleOptions: {Visibility: VISIBLE}
+              - Dropdown:
+                  FilterControlId: ctrl-year
+                  Title: Ano
+                  SourceFilterId: filter-year
+                  DisplayOptions:
+                    SelectAllOptions: {Visibility: VISIBLE}
+                    TitleOptions: {Visibility: VISIBLE}
+              - Dropdown:
+                  FilterControlId: ctrl-month
+                  Title: Mes
+                  SourceFilterId: filter-month
+                  DisplayOptions:
+                    SelectAllOptions: {Visibility: VISIBLE}
+                    TitleOptions: {Visibility: VISIBLE}
+
+            Visuals:
+              # --- Q1: Market Share Evolution (Line Chart) ---
+              - LineChartVisual:
+                  VisualId: q1-market-share
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q1 - Evolucao da Participacao de Mercado'}
+                  ChartConfiguration:
+                    FieldWells:
+                      LineChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: ano_mes
+                              Column: {DataSetIdentifier: MainDS, ColumnName: ano_mes}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: qtd_viagem
+                              Column: {DataSetIdentifier: MainDS, ColumnName: quantidade_viagem}
+                              AggregationFunction: {SimpleNumericalAggregation: SUM}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: tipo_transporte
+                              Column: {DataSetIdentifier: MainDS, ColumnName: grupo_tipo_transporte}
+
+              # --- Q1: Top Zonas por Tipo (Bar Chart) ---
+              # --- Q1: Corridas por Distrito - TAXI (Area) ---
+              - LineChartVisual:
+                  VisualId: q1-area-taxi
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q1 - Corridas por Distrito (TAXI)'}
+                  ChartConfiguration:
+                    Type: STACKED_AREA
+                    FieldWells:
+                      LineChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: mes
+                              Column: {DataSetIdentifier: MainDS, ColumnName: ano_mes}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: qtd
+                              Column: {DataSetIdentifier: MainDS, ColumnName: quantidade_viagem}
+                              AggregationFunction: {SimpleNumericalAggregation: SUM}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: distrito
+                              Column: {DataSetIdentifier: MainDS, ColumnName: distrito_embarque}
+
+              # --- Q1: Corridas por Distrito - APLICATIVO (Area) ---
+              - LineChartVisual:
+                  VisualId: q1-area-aplicativo
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q1 - Corridas por Distrito (APLICATIVO)'}
+                  ChartConfiguration:
+                    Type: STACKED_AREA
+                    FieldWells:
+                      LineChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: mes
+                              Column: {DataSetIdentifier: MainDS, ColumnName: ano_mes}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: qtd
+                              Column: {DataSetIdentifier: MainDS, ColumnName: quantidade_viagem}
+                              AggregationFunction: {SimpleNumericalAggregation: SUM}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: distrito
+                              Column: {DataSetIdentifier: MainDS, ColumnName: distrito_embarque}
+
+              # --- Q1: Corridas por Faixa Horaria (Bar) ---
+              - BarChartVisual:
+                  VisualId: q1-faixa-horaria
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q1 - Corridas por Faixa Horaria (TAXI vs HVFHV)'}
+                  ChartConfiguration:
+                    FieldWells:
+                      BarChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: horario
+                              Column: {DataSetIdentifier: MainDS, ColumnName: faixa_horaria}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: qtd
+                              Column: {DataSetIdentifier: MainDS, ColumnName: quantidade_viagem}
+                              AggregationFunction: {SimpleNumericalAggregation: SUM}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: tipo
+                              Column: {DataSetIdentifier: MainDS, ColumnName: grupo_tipo_transporte}
+                    BarsArrangement: CLUSTERED
+
+              # --- Q2: Percentual de Gorjeta por Corrida ao Longo do Tempo ---
+              - LineChartVisual:
+                  VisualId: q2-prob-gorjeta
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q2 - Percentual de Gorjeta por Corrida ao Longo do Tempo'}
+                  ChartConfiguration:
+                    FieldWells:
+                      LineChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: mes
+                              Column: {DataSetIdentifier: MainDS, ColumnName: ano_mes}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: pct_gorjeta
+                              Column: {DataSetIdentifier: MainDS, ColumnName: flag_gorjeta}
+                              AggregationFunction: {SimpleNumericalAggregation: AVERAGE}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: tipo
+                              Column: {DataSetIdentifier: MainDS, ColumnName: grupo_tipo_transporte}
+
+              # --- Q2: Valor Medio Gorjeta (Bar) ---
+              - BarChartVisual:
+                  VisualId: q2-valor-gorjeta
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q2 - Valor Medio da Gorjeta (Quando Paga)'}
+                  ChartConfiguration:
+                    FieldWells:
+                      BarChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: tipo
+                              Column: {DataSetIdentifier: MainDS, ColumnName: grupo_tipo_transporte}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: gorjeta_avg
+                              Column: {DataSetIdentifier: MainDS, ColumnName: valor_gorjeta}
+                              AggregationFunction: {SimpleNumericalAggregation: AVERAGE}
+
+              # --- Q2: Correlacao Gorjeta vs Fare (Scatter) ---
+              # --- Q2: Heatmap Gorjeta por Faixa Horaria x Distancia ---
+              - HeatMapVisual:
+                  VisualId: q2-bolha-horario
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q2 - Gorjeta por Faixa Horaria x Distancia'}
+                  ChartConfiguration:
+                    FieldWells:
+                      HeatMapAggregatedFieldWells:
+                        Rows:
+                          - CategoricalDimensionField:
+                              FieldId: distancia
+                              Column: {DataSetIdentifier: MainDS, ColumnName: faixa_distancia}
+                        Columns:
+                          - CategoricalDimensionField:
+                              FieldId: horario
+                              Column: {DataSetIdentifier: MainDS, ColumnName: faixa_horaria}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: gorjeta
+                              Column: {DataSetIdentifier: MainDS, ColumnName: valor_gorjeta}
+                              AggregationFunction: {SimpleNumericalAggregation: SUM}
+
+              # --- Q2: Heatmap Gorjeta por Regiao x Distancia ---
+              - HeatMapVisual:
+                  VisualId: q2-bolha-regiao
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q2 - Gorjeta por Regiao x Distancia'}
+                  ChartConfiguration:
+                    FieldWells:
+                      HeatMapAggregatedFieldWells:
+                        Rows:
+                          - CategoricalDimensionField:
+                              FieldId: distancia
+                              Column: {DataSetIdentifier: MainDS, ColumnName: faixa_distancia}
+                        Columns:
+                          - CategoricalDimensionField:
+                              FieldId: regiao
+                              Column: {DataSetIdentifier: MainDS, ColumnName: regiao_agrupada_embarque}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: gorjeta
+                              Column: {DataSetIdentifier: MainDS, ColumnName: valor_gorjeta}
+                              AggregationFunction: {SimpleNumericalAggregation: SUM}
+
+              # --- Q3: Gorjeta Media Pandemia (Line) ---
+              - LineChartVisual:
+                  VisualId: q3-gorjeta-pandemia
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q3 - Mudanca no Valor Medio da Gorjeta (Pre, Durante, Pos-Pandemia)'}
+                  ChartConfiguration:
+                    FieldWells:
+                      LineChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: mes
+                              Column: {DataSetIdentifier: MainDS, ColumnName: ano_mes}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: gorjeta
+                              Column: {DataSetIdentifier: MainDS, ColumnName: valor_gorjeta}
+                              AggregationFunction: {SimpleNumericalAggregation: AVERAGE}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: tipo
+                              Column: {DataSetIdentifier: MainDS, ColumnName: grupo_tipo_transporte}
+
+              # --- Q4: KPI Fee Media por Corrida ---
+              # --- Q4: Distribuicao por Regiao (Area Chart) ---
+              - LineChartVisual:
+                  VisualId: q4-antes-depois-cbd
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q4 - Distribuicao Corridas por Regiao: Antes vs Depois CBD'}
+                  ChartConfiguration:
+                    Type: STACKED_AREA
+                    FieldWells:
+                      LineChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: mes
+                              Column: {DataSetIdentifier: MainDS, ColumnName: ano_mes}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: qtd
+                              Column: {DataSetIdentifier: MainDS, ColumnName: quantidade_viagem}
+                              AggregationFunction: {SimpleNumericalAggregation: SUM}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: regiao
+                              Column: {DataSetIdentifier: MainDS, ColumnName: regiao_agrupada_embarque}
+                    SortConfiguration:
+                      CategorySort:
+                        - FieldSort:
+                            FieldId: mes
+                            Direction: ASC
+
+              # --- Q4: Volume Manhattan CBD (Area Chart) ---
+              - LineChartVisual:
+                  VisualId: q4-volume-manhattan
+                  Title:
+                    Visibility: VISIBLE
+                    FormatText: {PlainText: 'Q4 - Volume de Corridas Manhattan CBD (2024+): Taxi vs Aplicativo'}
+                  ChartConfiguration:
+                    Type: STACKED_AREA
+                    FieldWells:
+                      LineChartAggregatedFieldWells:
+                        Category:
+                          - CategoricalDimensionField:
+                              FieldId: mes
+                              Column: {DataSetIdentifier: MainDS, ColumnName: ano_mes}
+                        Values:
+                          - NumericalMeasureField:
+                              FieldId: qtd
+                              Column: {DataSetIdentifier: MainDS, ColumnName: quantidade_viagem}
+                              AggregationFunction: {SimpleNumericalAggregation: SUM}
+                        Colors:
+                          - CategoricalDimensionField:
+                              FieldId: tipo
+                              Column: {DataSetIdentifier: MainDS, ColumnName: grupo_tipo_transporte}
+                    SortConfiguration:
+                      CategorySort:
+                        - FieldSort:
+                            FieldId: mes
+                            Direction: ASC
+
+            Layouts:
+              - Configuration:
+                  GridLayout:
+                    Elements:
+                      # Q1 - Market share full width
+                      - {ElementId: q1-market-share, ElementType: VISUAL, ColumnIndex: 0, RowIndex: 0, ColumnSpan: 36, RowSpan: 12}
+                      - {ElementId: q1-area-taxi, ElementType: VISUAL, ColumnIndex: 0, RowIndex: 12, ColumnSpan: 18, RowSpan: 12}
+                      - {ElementId: q1-area-aplicativo, ElementType: VISUAL, ColumnIndex: 18, RowIndex: 12, ColumnSpan: 18, RowSpan: 12}
+                      - {ElementId: q1-faixa-horaria, ElementType: VISUAL, ColumnIndex: 0, RowIndex: 24, ColumnSpan: 36, RowSpan: 12}
+                      # Q2 - Row 36
+                      - {ElementId: q2-prob-gorjeta, ElementType: VISUAL, ColumnIndex: 0, RowIndex: 36, ColumnSpan: 36, RowSpan: 12}
+                      - {ElementId: q2-valor-gorjeta, ElementType: VISUAL, ColumnIndex: 0, RowIndex: 48, ColumnSpan: 12, RowSpan: 12}
+                      - {ElementId: q2-bolha-horario, ElementType: VISUAL, ColumnIndex: 12, RowIndex: 48, ColumnSpan: 12, RowSpan: 12}
+                      - {ElementId: q2-bolha-regiao, ElementType: VISUAL, ColumnIndex: 24, RowIndex: 48, ColumnSpan: 12, RowSpan: 12}
+                      # Q3 - Row 60
+                      - {ElementId: q3-gorjeta-pandemia, ElementType: VISUAL, ColumnIndex: 0, RowIndex: 60, ColumnSpan: 36, RowSpan: 12}
+                      # Q4 - Row 72
+                      - {ElementId: q4-antes-depois-cbd, ElementType: VISUAL, ColumnIndex: 0, RowIndex: 72, ColumnSpan: 36, RowSpan: 12}
+                      - {ElementId: q4-volume-manhattan, ElementType: VISUAL, ColumnIndex: 0, RowIndex: 84, ColumnSpan: 36, RowSpan: 12}
+
+Outputs:
+  DashboardURL:
+    Value: !Sub 'https://us-east-1.quicksight.aws.amazon.com/sn/dashboards/nyc-taxi-dashboard'
+  DataSetArn:
+    Value: !GetAtt MainDataSet.Arn
