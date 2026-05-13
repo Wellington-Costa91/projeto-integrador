@@ -6,7 +6,7 @@
 
 ---
 
-## 👥 Integrantes
+## Integrantes
 
 | Nome | Papel |
 |------|-------|
@@ -17,19 +17,19 @@
 
 ---
 
-## 📋 Descrição do Projeto
+## Descrição do Projeto
 
 Pipeline de dados end-to-end na AWS que ingere, transforma e modela dados de corridas de táxi e aplicativos de transporte de Nova York (2016–2025). Utiliza arquitetura **Medallion** (Bronze → Silver → Gold) com formato **Apache Iceberg**, orquestração via **AWS Step Functions** e visualização em **Amazon QuickSight**.
 
 ---
 
-## 🎯 Problema Resolvido
+## Problema Resolvido
 
 A NYC TLC disponibiliza dados de mais de 313 milhões de corridas anuais em centenas de arquivos Parquet com schemas heterogêneos entre 4 datasets. Este projeto unifica, limpa, modela e disponibiliza esses dados para análise dimensional.
 
 ---
 
-## 📊 Objetivos (Questões de Pesquisa)
+## Objetivos (Questões de Pesquisa)
 
 | # | Questão |
 |---|---------|
@@ -40,7 +40,7 @@ A NYC TLC disponibiliza dados de mais de 313 milhões de corridas anuais em cent
 
 ---
 
-## 🏗️ Arquitetura da Solução
+## Arquitetura da Solução
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -64,7 +64,7 @@ A NYC TLC disponibiliza dados de mais de 313 milhões de corridas anuais em cent
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## Tecnologias Utilizadas
 
 | Tecnologia | Uso |
 |------------|-----|
@@ -79,7 +79,7 @@ A NYC TLC disponibiliza dados de mais de 313 milhões de corridas anuais em cent
 
 ---
 
-## 📁 Estrutura do Repositório
+## Estrutura do Repositório
 
 ```
 IAC/
@@ -114,7 +114,7 @@ IAC/
 
 ---
 
-## ⚙️ Pré-requisitos
+## Pré-requisitos
 
 - Terraform >= 1.5
 - AWS CLI v2 configurado
@@ -124,7 +124,7 @@ IAC/
 
 ---
 
-## 🚀 Instalação e Configuração
+## Instalação e Configuração
 
 ```bash
 # Clonar repositório
@@ -142,7 +142,7 @@ terraform apply
 
 ---
 
-## ▶️ Como Executar
+## Como Executar
 
 ### Pipeline completo (ingestão + transformação)
 ```bash
@@ -160,7 +160,7 @@ aws stepfunctions start-execution \
 
 ---
 
-## 📈 Dados Utilizados
+## Dados Utilizados
 
 | Dataset | Período | Fonte |
 |---------|---------|-------|
@@ -172,17 +172,17 @@ aws stepfunctions start-execution \
 
 ---
 
-## 🎤 Apresentação Final
+## Apresentação Final
 
 A apresentação executiva do projeto (slides de defesa) está disponível em:
 
-📎 **[docs/Apresentação_Final.pdf](docs/Apresentação_Final.pdf)**
+**[docs/Apresentação_Final.pdf](docs/Apresentação_Final.pdf)**
 
 Contém: contexto e questões de pesquisa, arquitetura serverless 100% IaC na AWS, volume processado (≈3 bilhões de corridas / 189 GB), modelo dimensional e principais insights (dinâmica táxi vs aplicativos, gorjetas, impacto COVID-19 e taxa CBD).
 
 ---
 
-## 📸 Evidências
+## Evidências
 
 - `dashboard/dashboard.png` — Screenshot do dashboard QuickSight
 - `docs/tabela-gold.jpeg` — Modelo dimensional Gold
@@ -191,7 +191,7 @@ Contém: contexto e questões de pesquisa, arquitetura serverless 100% IaC na AW
 
 ---
 
-## 🔮 Melhorias Futuras
+## Melhorias Futuras
 
 - Backend remoto para Terraform (S3 + DynamoDB lock)
 - Alertas SNS para falhas no pipeline
