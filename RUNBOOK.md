@@ -1,4 +1,4 @@
-# 🚕 NYC Taxi Pipeline — RUNBOOK Operacional
+# NYC Taxi Pipeline — RUNBOOK Operacional
 
 > Guia prático de operação, execução e manutenção do pipeline.
 
