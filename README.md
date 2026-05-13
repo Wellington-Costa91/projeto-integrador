@@ -1,4 +1,4 @@
-# 🚕 NYC Taxi Pipeline
+# NYC Taxi Pipeline
 
 > Pipeline de dados completo na AWS para análise de transporte urbano de Nova York (NYC TLC)
 
